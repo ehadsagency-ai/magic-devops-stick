@@ -40,21 +40,20 @@ Pour commencer votre aventure DevOps, suivez ces trois étapes simples :
 
 1.  **Clonez le projet** :
     ```bash
-    git clone https://github.com/your-repo/magic-devops-stick.git
+    git clone https://github.com/ehadsagency-ai/magic-devops-stick.git
     cd magic-devops-stick
     ```
 
 2.  **Lancez l'installation** :
-    Le script vous demandera les droits `sudo` pour installer les paquets nécessaires.
+    Le script appelle `sudo` pour certaines opérations ; exécutez-le depuis votre compte habituel. Son installation complète n’a pas été testée dans ce contrôle.
     ```bash
-    cd scripts
-    ./install.sh --mode full
+    ./scripts/install.sh --mode full
     ```
 
 3.  **Consultez le guide de démarrage** :
     Une fois l'installation terminée, commencez par lire le guide de démarrage pour une vue d'ensemble complète.
     ```bash
-    less ../docs/GETTING_STARTED.md
+    less docs/GETTING_STARTED.md
     ```
 
 ## Prérequis
@@ -70,8 +69,8 @@ Avant de lancer l'installation, assurez-vous que votre système répond aux exig
 
 ## Contribution
 
-Ce projet est open source et nous accueillons avec plaisir les contributions de la communauté. Si vous souhaitez améliorer le Magic DevOps Stick, veuillez consulter notre guide de contribution (`CONTRIBUTING.md`) pour plus de détails sur la manière de soumettre des pull requests, de signaler des bugs ou de suggérer de nouvelles fonctionnalités.
+Ce projet accueille les contributions de la communauté. Aucun fichier `CONTRIBUTING.md` n’est présent dans l’arbre suivi actuel.
 
 ## Licence
 
-Ce projet est distribué sous la licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+Le README racine annonce une licence MIT, mais aucun fichier `LICENSE` n’est présent dans l’arbre suivi actuel.

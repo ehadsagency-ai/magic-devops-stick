@@ -4,7 +4,7 @@ Ce document fournit des instructions détaillées pour l'installation du **Magic
 
 ## 1. Prérequis
 
-Avant de commencer, assurez-vous que votre système est à jour et dispose des outils de base suivants. La plupart des systèmes Linux et macOS les incluent par défaut.
+Avant de commencer, assurez-vous que votre système dispose de `git`, `curl` et `wget`. La commande suivante concerne Ubuntu uniquement ; elle ne s’applique pas à macOS.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git curl wget
@@ -25,8 +25,8 @@ L'installation est gérée par un script unique qui automatise le téléchargeme
 Ouvrez un terminal et clonez le projet depuis son dépôt Git.
 
 ```bash
-git clone https://github.com/your-repo/magic-devops-stick.git
-cd magic-devops-stick/scripts
+git clone https://github.com/ehadsagency-ai/magic-devops-stick.git
+cd magic-devops-stick
 ```
 
 ### Étape 2: Rendre le Script Exécutable
@@ -34,19 +34,19 @@ cd magic-devops-stick/scripts
 Assurez-vous que le script d'installation a les permissions d'exécution.
 
 ```bash
-chmod +x install.sh
+chmod +x scripts/install.sh
 ```
 
 ### Étape 3: Lancer l'Installation
 
-Le script `install.sh` accepte un argument `--mode` pour personnaliser l'installation. Si aucun mode n'est spécifié, le mode `full` est utilisé par défaut.
+Le script `scripts/install.sh` accepte un argument `--mode` pour personnaliser l’installation. Si aucun mode n’est spécifié, le mode `full` est utilisé par défaut. Il appelle `sudo` pour certaines opérations : lancez-le depuis votre compte habituel. L’installation complète n’a pas été testée dans ce contrôle.
 
 #### Mode d'Installation Complet (`full`)
 
 Ce mode installe tous les outils et configurations. C'est le mode recommandé pour une expérience d'apprentissage complète.
 
 ```bash
-sudo ./install.sh --mode full
+./scripts/install.sh --mode full
 ```
 
 #### Mode d'Installation Modulaire (`modular`)
@@ -54,7 +54,7 @@ sudo ./install.sh --mode full
 Ce mode interactif vous permet de choisir les composants à installer. Utilisez-le si vous manquez de ressources ou si vous souhaitez vous concentrer sur des outils spécifiques.
 
 ```bash
-sudo ./install.sh --mode modular
+./scripts/install.sh --mode modular
 ```
 
 #### Mode d'Installation Léger (`light`)
@@ -62,7 +62,7 @@ sudo ./install.sh --mode modular
 Ce mode installe uniquement les outils essentiels : Docker, Terraform, et Ansible. Idéal pour les machines avec des ressources limitées.
 
 ```bash
-sudo ./install.sh --mode light
+./scripts/install.sh --mode light
 ```
 
 #### Mode d'Installation Cloud (`cloud`)
@@ -70,7 +70,7 @@ sudo ./install.sh --mode light
 Ce mode est optimisé pour les environnements cloud (comme une instance EC2). Il installe les outils nécessaires pour interagir avec les fournisseurs de cloud et déployer des infrastructures.
 
 ```bash
-sudo ./install.sh --mode cloud
+./scripts/install.sh --mode cloud
 ```
 
 ## 3. Post-Installation
@@ -79,7 +79,7 @@ Une fois l'installation terminée, quelques étapes sont nécessaires pour final
 
 ### Ajout de l'Utilisateur au Groupe Docker
 
-Pour utiliser Docker sans `sudo`, le script tente d'ajouter votre utilisateur au groupe `docker`. Vous devrez peut-être vous déconnecter et vous reconnecter (ou redémarrer votre terminal) pour que ce changement prenne effet.
+Sur Linux, le script tente d’ajouter votre utilisateur au groupe `docker` pour permettre son utilisation sans `sudo`. Cette commande `usermod` ne s’applique pas à macOS. Sous Linux, vous devrez peut-être vous déconnecter et vous reconnecter pour que le changement prenne effet.
 
 ```bash
 sudo usermod -aG docker $USER
@@ -91,7 +91,7 @@ newgrp docker
 Exécutez le script de validation pour vous assurer que tout est en ordre.
 
 ```bash
-./validate-setup.sh
+./scripts/validate-setup.sh
 ```
 
 ## 4. Dépannage
@@ -103,7 +103,7 @@ Voici une liste des problèmes courants et de leurs solutions.
 | **Erreur `permission denied` en utilisant Docker** | Assurez-vous que votre utilisateur fait partie du groupe `docker` et que vous avez redémarré votre session. Vérifiez avec la commande `groups`. |
 | **Échec du téléchargement d'un paquet ou d'une image** | Vérifiez votre connexion Internet. Si vous êtes derrière un proxy, assurez-vous que vos variables d'environnement (`HTTP_PROXY`, `HTTPS_PROXY`) sont correctement configurées. |
 | **`kubectl` ne peut pas se connecter au cluster** | Si vous utilisez Docker Desktop, assurez-vous que Kubernetes est activé. Si vous utilisez `kind` ou `minikube`, assurez-vous que le cluster est démarré (`kind create cluster` ou `minikube start`). |
-| **Espace disque insuffisant** | Le script `cleanup.sh` peut vous aider à libérer de l'espace. Utilisez `docker system prune -a --volumes` pour un nettoyage en profondeur de Docker. |
+| **Espace disque insuffisant** | Identifiez les fichiers et volumes concernés avant toute suppression. `scripts/cleanup.sh` contient des suppressions et n’a pas été testé dans ce contrôle ; revoyez ses cibles et disposez d’une sauvegarde vérifiée avant usage. |
 | **Conflits de ports** | Si un service ne démarre pas en raison d'un conflit de port, modifiez le fichier `docker-compose.yml` pour mapper le service sur un port différent sur votre machine hôte (par exemple, changez `"8080:8080"` en `"8081:8080"`). |
 
 Si vous rencontrez un problème qui n'est pas listé ici, veuillez ouvrir une 

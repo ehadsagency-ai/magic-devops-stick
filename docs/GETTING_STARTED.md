@@ -1,12 +1,12 @@
 # Guide de Démarrage - Magic DevOps Stick
 
-Bienvenue dans le **Magic DevOps Stick** ! Ce guide est votre point de départ pour explorer l'environnement de formation que vous venez d'installer. Nous allons vous présenter la structure du projet, comment interagir avec les outils installés, et comment aborder votre parcours d'apprentissage.
+Bienvenue dans le **Magic DevOps Stick** ! Ce guide présente la structure du projet, les commandes disponibles et le parcours d’apprentissage. Il ne confirme pas qu’une installation a été exécutée sur votre machine.
 
 ## 1. Comprendre Votre Nouvel Environnement
 
-Le script d'installation a configuré une suite complète d'outils DevOps sur votre machine. La plupart de ces outils sont soit directement accessibles via la ligne de commande (comme `docker`, `kubectl`, `terraform`), soit disponibles sous forme d'images Docker prêtes à être lancées (comme `jenkins`, `grafana`).
+Le script d’installation vise à configurer des outils DevOps sur votre machine. Leur disponibilité dépend de l’installation effectivement réalisée ; vérifiez-la avant de lancer les exemples.
 
-L'objectif est de vous fournir un bac à sable (sandbox) où vous pouvez expérimenter sans risque. N'hésitez pas à modifier les configurations, à lancer les exemples, et à casser des choses. Le script `cleanup.sh` est là pour vous aider à repartir d'un état propre.
+Ce dépôt ne garantit pas l’isolation de votre machine. L’installation appelle des commandes avec privilèges d’administration ; travaillez dans une machine virtuelle dédiée ou sur une machine de test avec sauvegarde vérifiée. N’exécutez `scripts/cleanup.sh` qu’après avoir revu ses cibles et ses effets. Aucun mode de nettoyage n’a été testé dans ce contrôle.
 
 ## 2. Structure du Projet
 
@@ -22,14 +22,13 @@ Familiarisez-vous avec l'organisation du projet. Voici un aperçu des répertoir
 
 ## 3. Valider Votre Installation
 
-Avant de plonger dans les modules, il est recommandé de vérifier que tout est correctement installé. Le script `validate-setup.sh` est conçu pour cela.
+Depuis la racine du dépôt, le script `scripts/validate-setup.sh` permet de contrôler les composants disponibles.
 
 ```bash
-cd ../scripts
-./validate-setup.sh
+./scripts/validate-setup.sh
 ```
 
-Ce script effectuera une série de vérifications sur tous les composants installés et vous fournira un rapport détaillé. Si des erreurs (`✗`) apparaissent, consultez la section de dépannage dans le fichier `INSTALLATION.md`.
+Ce script effectue une série de vérifications et fournit un rapport. Si des erreurs apparaissent, consultez la section de dépannage dans `docs/INSTALLATION.md`.
 
 ## 4. Votre Premier Module : Fondamentaux Linux
 
@@ -37,7 +36,7 @@ Nous vous recommandons de commencer par le premier module pour vous familiariser
 
 1.  **Ouvrez le document du module** :
     ```bash
-    less ../docs/modules/01-linux-fundamentals.md
+    less docs/modules/01-linux-fundamentals.md
     ```
 
 2.  **Lisez les concepts** : Le document explique les commandes de base, la gestion des fichiers, les permissions, et le scripting shell.
@@ -46,36 +45,13 @@ Nous vous recommandons de commencer par le premier module pour vous familiariser
 
 4.  **Faites les exercices** : Rendez-vous dans le répertoire `exercises/beginner/` et essayez de résoudre les défis proposés.
 
-## 5. Lancer une Stack Applicative Complète
+## 5. Examiner le modèle de stack applicative
 
-Pour avoir un aperçu de la puissance de l'environnement, vous pouvez lancer une stack applicative complète (application web, base de données, cache) en une seule commande grâce à Docker Compose.
+Depuis la racine du dépôt, vous pouvez lire le modèle Docker Compose. Il référence `configs/docker/app/`, `configs/docker/prometheus.yml` et un `requirements.txt` dans le contexte de construction, absents de l’arbre suivi. La stack ne peut donc pas être lancée telle quelle.
 
-1.  **Naviguez vers le répertoire de configuration Docker** :
-    ```bash
-    cd ../configs/docker
-    ```
-
-2.  **Lancez la stack en arrière-plan** :
-    ```bash
-    docker-compose up -d
-    ```
-
-3.  **Vérifiez que les conteneurs tournent** :
-    ```bash
-    docker-compose ps
-    ```
-    Vous devriez voir plusieurs services en cours d'exécution : `web`, `postgres`, `redis`, `prometheus`, `grafana`, etc.
-
-4.  **Accédez aux services** :
-    - **Application Web**: [http://localhost:8000](http://localhost:8000)
-    - **Grafana**: [http://localhost:3000](http://localhost:3000) (login: admin / pass: admin)
-    - **Prometheus**: [http://localhost:9090](http://localhost:9090)
-    - **Kibana**: [http://localhost:5601](http://localhost:5601)
-
-5.  **Arrêtez et nettoyez la stack** lorsque vous avez terminé :
-    ```bash
-    docker-compose down --volumes
-    ```
+```bash
+less configs/docker/docker-compose.yml
+```
 
 ## 6. Et Ensuite ?
 
