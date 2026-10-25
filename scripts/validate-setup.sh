@@ -1,20 +1,20 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ################################################################################
 # Magic DevOps Stick - Validation Script
 # 
-# Description: Script de validation complète de l'environnement DevOps
-# Usage: ./validate-setup.sh [--verbose]
+# Description: Read-only checks for the local DevOps environment
+# Usage: ./scripts/validate-setup.sh
 # Author: Magic DevOps Team
 # Version: 1.0.0
 ################################################################################
 
 set -euo pipefail
+IFS=$'\n\t'
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VERBOSE="${1:-0}"
 
 # Couleurs
 RED='\033[0;31m'
@@ -27,24 +27,26 @@ NC='\033[0m'
 PASSED=0
 FAILED=0
 WARNINGS=0
+DOCKER_IMAGES_READ=0
+DOCKER_REPOSITORIES=''
 
 ################################################################################
 # Fonctions Utilitaires
 ################################################################################
 
 check_pass() {
-    echo -e "${GREEN}✓${NC} $@"
-    ((PASSED++))
+    echo -e "${GREEN}✓${NC} $*"
+    PASSED=$((PASSED + 1))
 }
 
 check_fail() {
-    echo -e "${RED}✗${NC} $@"
-    ((FAILED++))
+    echo -e "${RED}✗${NC} $*"
+    FAILED=$((FAILED + 1))
 }
 
 check_warn() {
-    echo -e "${YELLOW}⚠${NC} $@"
-    ((WARNINGS++))
+    echo -e "${YELLOW}⚠${NC} $*"
+    WARNINGS=$((WARNINGS + 1))
 }
 
 check_command() {
@@ -54,15 +56,53 @@ check_command() {
     return 1
 }
 
-get_version() {
-    local cmd="$1"
-    local flag="${2:---version}"
-    
-    if check_command "$cmd"; then
-        "$cmd" $flag 2>&1 | head -1
+first_semver() {
+    local output
+    output="$("$@" 2>&1)" || return 1
+    if [[ "$output" =~ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+        printf '%s' "${BASH_REMATCH[1]}"
     else
-        echo "Not installed"
+        return 2
     fi
+}
+
+check_version() {
+    local label="$1"
+    local version
+    shift
+    if version="$(first_semver "$@")"; then
+        check_pass "$label : $version"
+    else
+        local status=$?
+        if [ "$status" -eq 2 ]; then
+            check_warn "$label : commande présente, version non reconnue"
+        else
+            check_fail "$label : sonde de version en échec"
+        fi
+    fi
+}
+
+repository_present() {
+    local expected="$1"
+    local repository
+    while IFS= read -r repository; do
+        if [ "$repository" = "$expected" ]; then
+            return 0
+        fi
+    done <<< "$DOCKER_REPOSITORIES"
+    return 1
+}
+
+docker_compose_declared() {
+    local help_output
+    local line
+    help_output="$(docker --help 2>/dev/null)" || return 2
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]+compose\*?[[:space:]]+ ]]; then
+            return 0
+        fi
+    done <<< "$help_output"
+    return 1
 }
 
 ################################################################################
@@ -82,33 +122,52 @@ validate_system() {
     fi
     
     # Vérifier l'espace disque
-    local available_space=$(df "$PROJECT_ROOT" | tail -1 | awk '{print $4}')
-    local available_gb=$((available_space / 1024 / 1024))
-    
-    if [ "$available_gb" -ge 20 ]; then
-        check_pass "Espace disque : ${available_gb} GB (requis : 20 GB)"
+    local available_space
+    if available_space="$(df -Pk "$PROJECT_ROOT" | awk 'NR == 2 {print $4}')" \
+        && [[ "$available_space" =~ ^[0-9]+$ ]]; then
+        local available_gib=$((10#$available_space / 1024 / 1024))
+        if [ "$available_gib" -ge 20 ]; then
+            check_pass "Espace disque : ${available_gib} GiB (requis : 20 GiB)"
+        else
+            check_fail "Espace disque insuffisant : ${available_gib} GiB (requis : 20 GiB)"
+        fi
     else
-        check_fail "Espace disque insuffisant : ${available_gb} GB (requis : 20 GB)"
+        check_warn "Espace disque : capacité non mesurable"
     fi
     
     # Vérifier la RAM
-    local available_ram=$(free -m 2>/dev/null | awk '/^Mem:/ {print $2}' || echo "0")
-    if [ "$available_ram" -gt 0 ]; then
-        local available_gb=$((available_ram / 1024))
-        if [ "$available_gb" -ge 16 ]; then
-            check_pass "RAM : ${available_gb} GB (recommandé : 16 GB)"
-        elif [ "$available_gb" -ge 8 ]; then
-            check_warn "RAM : ${available_gb} GB (recommandé : 16 GB)"
-        else
-            check_fail "RAM insuffisante : ${available_gb} GB (minimum : 8 GB)"
+    local total_ram_mb=''
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        local total_ram_bytes
+        if total_ram_bytes="$(sysctl -n hw.memsize 2>/dev/null)" \
+            && [[ "$total_ram_bytes" =~ ^[0-9]+$ ]]; then
+            total_ram_mb=$((10#$total_ram_bytes / 1024 / 1024))
+        fi
+    elif check_command free; then
+        local measured_ram_mb
+        if measured_ram_mb="$(free -m | awk '/^Mem:/ {print $2}')" \
+            && [[ "$measured_ram_mb" =~ ^[0-9]+$ ]]; then
+            total_ram_mb="$measured_ram_mb"
         fi
     fi
-    
-    # Vérifier la connexion Internet
-    if ping -c 1 8.8.8.8 &> /dev/null; then
-        check_pass "Connexion Internet : OK"
+    if [[ "$total_ram_mb" =~ ^[0-9]+$ ]] && [ "$total_ram_mb" -gt 0 ]; then
+        local available_gib=$((10#$total_ram_mb / 1024))
+        if [ "$available_gib" -ge 16 ]; then
+            check_pass "RAM : ${available_gib} GiB (recommandé : 16 GiB)"
+        elif [ "$available_gib" -ge 8 ]; then
+            check_warn "RAM : ${available_gib} GiB (recommandé : 16 GiB)"
+        else
+            check_fail "RAM insuffisante : ${available_gib} GiB (minimum : 8 GiB)"
+        fi
     else
-        check_warn "Connexion Internet : Non disponible"
+        check_warn "RAM : capacité non mesurable"
+    fi
+    
+    # ICMP failure does not prove that HTTPS access is unavailable.
+    if ping -c 1 8.8.8.8 &> /dev/null; then
+        check_pass "Test ICMP vers 8.8.8.8 : OK"
+    else
+        check_warn "Test ICMP vers 8.8.8.8 échoué (connectivité indéterminée)"
     fi
 }
 
@@ -116,20 +175,30 @@ validate_docker() {
     echo -e "\n${BLUE}=== Validation de Docker ===${NC}"
     
     if check_command docker; then
-        check_pass "Docker installé : $(docker --version | cut -d' ' -f3)"
+        check_version "Docker" docker --version
         
         # Vérifier que Docker est en cours d'exécution
         if docker ps &> /dev/null; then
             check_pass "Docker daemon : En cours d'exécution"
+            if DOCKER_REPOSITORIES="$(docker image ls --format '{{.Repository}}' 2>/dev/null)"; then
+                DOCKER_IMAGES_READ=1
+            fi
         else
-            check_fail "Docker daemon : Non en cours d'exécution"
+            check_fail "Docker daemon : indisponible"
         fi
         
-        # Vérifier Docker Compose
-        if check_command docker-compose; then
-            check_pass "Docker Compose : $(docker-compose --version | cut -d' ' -f3)"
+        # Inspect the CLI command list without running the Compose plugin.
+        if docker_compose_declared; then
+            check_pass "Docker Compose v2 : déclaré par le CLI (fonctionnement non testé)"
         else
-            check_warn "Docker Compose : Non installé"
+            local compose_probe_status=$?
+            if check_command docker-compose; then
+                check_pass "Docker Compose : exécutable historique présent (fonctionnement non testé)"
+            elif [ "$compose_probe_status" -eq 2 ]; then
+                check_warn "Docker Compose : détection du plugin v2 impossible ; exécutable historique absent"
+            else
+                check_warn "Docker Compose : plugin v2 non déclaré ; exécutable historique absent"
+            fi
         fi
     else
         check_fail "Docker : Non installé"
@@ -140,28 +209,22 @@ validate_kubernetes() {
     echo -e "\n${BLUE}=== Validation de Kubernetes ===${NC}"
     
     if check_command kubectl; then
-        local k8s_version=$(kubectl version --client --short 2>/dev/null | grep -oP 'v\d+\.\d+\.\d+' || echo "unknown")
-        check_pass "kubectl : $k8s_version"
+        check_version "kubectl" kubectl version --client
         
-        # Vérifier la connexion au cluster
-        if kubectl cluster-info &> /dev/null; then
-            check_pass "Cluster Kubernetes : Connecté"
-        else
-            check_warn "Cluster Kubernetes : Non connecté"
-        fi
+        # Cluster access may invoke an authentication plugin and change local state.
+        check_warn "Cluster Kubernetes : connexion non vérifiée par ce contrôle local"
     else
         check_fail "kubectl : Non installé"
     fi
     
     if check_command kind; then
-        check_pass "Kind : $(kind --version | cut -d' ' -f3)"
+        check_version "Kind" kind --version
     else
         check_warn "Kind : Non installé"
     fi
     
     if check_command helm; then
-        local helm_version=$(helm version --short 2>/dev/null | grep -oP 'v\d+\.\d+\.\d+' || echo "unknown")
-        check_pass "Helm : $helm_version"
+        check_version "Helm" helm version --short
     else
         check_warn "Helm : Non installé"
     fi
@@ -171,15 +234,13 @@ validate_infrastructure_as_code() {
     echo -e "\n${BLUE}=== Validation de l'Infrastructure as Code ===${NC}"
     
     if check_command terraform; then
-        local tf_version=$(terraform version -json 2>/dev/null | grep -o '"terraform_version":"[^"]*"' | cut -d'"' -f4)
-        check_pass "Terraform : $tf_version"
+        check_pass "Terraform : commande présente, version non interrogée"
     else
         check_fail "Terraform : Non installé"
     fi
     
     if check_command ansible; then
-        local ansible_version=$(ansible --version | head -1 | grep -oP '\d+\.\d+\.\d+')
-        check_pass "Ansible : $ansible_version"
+        check_pass "Ansible : commande présente, version non interrogée"
     else
         check_fail "Ansible : Non installé"
     fi
@@ -190,18 +251,20 @@ validate_cicd() {
     
     # Vérifier Git
     if check_command git; then
-        check_pass "Git : $(git --version | cut -d' ' -f3)"
+        check_version "Git" git --version
     else
         check_fail "Git : Non installé"
     fi
     
     # Vérifier Jenkins (via Docker)
-    if check_command docker; then
-        if docker images | grep -q jenkins; then
+    if [ "$DOCKER_IMAGES_READ" -eq 1 ]; then
+        if repository_present 'jenkins/jenkins'; then
             check_pass "Jenkins image : Disponible"
         else
-            check_warn "Jenkins image : Non téléchargée"
+            check_warn "Jenkins image : jenkins/jenkins absent"
         fi
+    elif check_command docker; then
+        check_warn "Jenkins image : non vérifiée (lecture Docker indisponible)"
     fi
 }
 
@@ -209,18 +272,19 @@ validate_monitoring() {
     echo -e "\n${BLUE}=== Validation du Monitoring ===${NC}"
     
     if check_command prometheus; then
-        local prom_version=$(prometheus --version 2>&1 | head -1 | grep -oP '\d+\.\d+\.\d+')
-        check_pass "Prometheus : $prom_version"
+        check_version "Prometheus" prometheus --version
     else
         check_warn "Prometheus : Non installé"
     fi
     
-    if check_command docker; then
-        if docker images | grep -q grafana; then
+    if [ "$DOCKER_IMAGES_READ" -eq 1 ]; then
+        if repository_present 'grafana/grafana'; then
             check_pass "Grafana image : Disponible"
         else
-            check_warn "Grafana image : Non téléchargée"
+            check_warn "Grafana image : grafana/grafana absent"
         fi
+    elif check_command docker; then
+        check_warn "Grafana image : non vérifiée (lecture Docker indisponible)"
     fi
 }
 
@@ -228,40 +292,32 @@ validate_security() {
     echo -e "\n${BLUE}=== Validation de la Sécurité ===${NC}"
     
     if check_command vault; then
-        local vault_version=$(vault version 2>&1 | grep -oP 'Vault v\d+\.\d+\.\d+' | cut -d' ' -f2)
-        check_pass "Vault : $vault_version"
+        check_version "Vault" vault version
     else
         check_warn "Vault : Non installé"
     fi
     
-    # Vérifier les permissions sudo
-    if sudo -n true 2>/dev/null; then
-        check_pass "Permissions sudo : OK (sans mot de passe)"
-    else
-        check_warn "Permissions sudo : Mot de passe requis"
-    fi
+    # Sudo may log an authentication attempt even with -n; keep this probe local.
+    check_warn "Permissions sudo : non vérifiées par ce contrôle local"
 }
 
 validate_cloud_cli() {
     echo -e "\n${BLUE}=== Validation des Cloud CLI ===${NC}"
     
     if check_command aws; then
-        local aws_version=$(aws --version 2>&1 | cut -d' ' -f1)
-        check_pass "AWS CLI : $aws_version"
+        check_pass "AWS CLI : installé (version non interrogée)"
     else
         check_warn "AWS CLI : Non installé"
     fi
     
     if check_command az; then
-        local az_version=$(az version --output json 2>/dev/null | grep -o '"azure-cli": "[^"]*"' | cut -d'"' -f4)
-        check_pass "Azure CLI : $az_version"
+        check_pass "Azure CLI : installé (version non interrogée)"
     else
         check_warn "Azure CLI : Non installé"
     fi
     
     if check_command gcloud; then
-        local gcloud_version=$(gcloud --version 2>&1 | head -1 | grep -oP '\d+\.\d+\.\d+')
-        check_pass "Google Cloud SDK : $gcloud_version"
+        check_pass "Google Cloud SDK : installé (version non interrogée)"
     else
         check_warn "Google Cloud SDK : Non installé"
     fi
@@ -271,22 +327,19 @@ validate_programming_languages() {
     echo -e "\n${BLUE}=== Validation des Langages de Programmation ===${NC}"
     
     if check_command python3; then
-        local py_version=$(python3 --version 2>&1 | cut -d' ' -f2)
-        check_pass "Python 3 : $py_version"
+        check_version "Python 3" python3 --version
     else
         check_warn "Python 3 : Non installé"
     fi
     
     if check_command node; then
-        local node_version=$(node --version)
-        check_pass "Node.js : $node_version"
+        check_version "Node.js" node --version
     else
         check_warn "Node.js : Non installé"
     fi
     
     if check_command go; then
-        local go_version=$(go version 2>&1 | grep -oP 'go\d+\.\d+\.\d+')
-        check_pass "Go : $go_version"
+        check_version "Go" go version
     else
         check_warn "Go : Non installé"
     fi
@@ -351,7 +404,10 @@ generate_report() {
 ################################################################################
 
 main() {
-    clear
+    # Preserve captured output and run without TERM in non-interactive shells.
+    if [[ -t 1 && -n "${TERM:-}" && "$TERM" != dumb ]]; then
+        clear || :
+    fi
     echo -e "${BLUE}"
     echo "╔════════════════════════════════════════════════════════════════╗"
     echo "║      Magic DevOps Stick - Validation de l'Installation        ║"

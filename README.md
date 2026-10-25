@@ -43,16 +43,16 @@ Fournir un environnement DevOps complet et portable qui fonctionne sur n'importe
 ```bash
 # 1. Cloner le projet
 git clone https://github.com/ehadsagency-ai/magic-devops-stick.git
-cd magic-devops-stick/scripts
+cd magic-devops-stick
 
 # 2. Installer (mode complet)
-sudo ./install.sh --mode full
+./scripts/install.sh --mode full
 
 # 3. Valider l'installation
-./validate-setup.sh
+./scripts/validate-setup.sh
 
 # 4. Commencer l'apprentissage
-cd ../docs && less GETTING_STARTED.md
+less docs/GETTING_STARTED.md
 ```
 
 ---
@@ -61,7 +61,7 @@ cd ../docs && less GETTING_STARTED.md
 
 ### Stack DevOps Complète
 
-```
+```text
 DevOps Tools/
 ├── Containerization
 │   ├── Docker & Docker Compose
@@ -101,7 +101,7 @@ DevOps Tools/
 
 ## 📋 Structure du Projet
 
-```
+```text
 magic-devops-stick/
 ├── .manus/                    # Gouvernance (Spec Kit)
 │   ├── constitution.md        # Vision et principes
@@ -123,36 +123,36 @@ magic-devops-stick/
 ├── examples/                  # Exemples pratiques
 │   └── docker-examples/
 └── exercises/                 # Exercices
-    ├── beginner/
-    ├── intermediate/
-    └── advanced/
+    └── beginner/
 ```
 
 ---
 
 ## 🛠️ Modes d'Installation
 
+Le script appelle lui-même `sudo` pour certaines opérations. Les commandes ci-dessous partent de la racine du dépôt et s’exécutent depuis votre compte habituel ; l’installation complète n’a pas été testée dans ce contrôle.
+
 ### 1. Mode Complet (Recommandé)
 ```bash
-sudo ./install.sh --mode full
+./scripts/install.sh --mode full
 ```
 Installe tous les outils. Durée : 20-30 minutes.
 
 ### 2. Mode Modulaire
 ```bash
-sudo ./install.sh --mode modular
+./scripts/install.sh --mode modular
 ```
 Sélection interactive des composants.
 
 ### 3. Mode Léger
 ```bash
-sudo ./install.sh --mode light
+./scripts/install.sh --mode light
 ```
 Essentiels uniquement (Docker, Terraform, Ansible).
 
 ### 4. Mode Cloud
 ```bash
-sudo ./install.sh --mode cloud
+./scripts/install.sh --mode cloud
 ```
 Optimisé pour déploiement cloud.
 
@@ -213,16 +213,14 @@ Optimisé pour déploiement cloud.
 
 ## 🚀 Exemples d'Utilisation
 
-### Lancer une Stack Complète
+Chaque exemple ci-dessous part de la racine du dépôt.
+
+### Examiner le modèle Docker Compose
 ```bash
-cd configs/docker
-docker-compose up -d
+less configs/docker/docker-compose.yml
 ```
 
-Accès :
-- Application : http://localhost:8000
-- Grafana : http://localhost:3000
-- Prometheus : http://localhost:9090
+Ce modèle référence `configs/docker/app/`, `configs/docker/prometheus.yml` et un `requirements.txt` dans le contexte de construction, absents de l’arbre suivi. Il ne peut donc pas être démarré tel quel.
 
 ### Déployer sur Kubernetes
 ```bash
@@ -243,8 +241,7 @@ terraform apply
 ## 🧪 Validation
 
 ```bash
-cd scripts
-./validate-setup.sh
+./scripts/validate-setup.sh
 ```
 
 Le script vérifie :
@@ -261,17 +258,7 @@ Le script vérifie :
 
 ## 🧹 Nettoyage
 
-### Nettoyage Léger
-```bash
-./cleanup.sh --light
-```
-Supprime logs, cache, fichiers temporaires.
-
-### Nettoyage Complet
-```bash
-./cleanup.sh --full
-```
-Supprime Docker, Kubernetes, Terraform.
+Le script `scripts/cleanup.sh` propose un mode léger et un mode complet. Il contient notamment `rm -rf`, `find … -delete` et `xargs rm -f`. Ses cibles de suppression et ses effets doivent être revus sur une copie avec sauvegarde vérifiée avant toute exécution. Aucun des deux modes n’a été testé dans ce contrôle.
 
 ---
 
@@ -300,7 +287,7 @@ Nous accueillons les contributions !
 
 ## 📄 Licence
 
-Ce projet est distribué sous la licence MIT. Voir [LICENSE](LICENSE) pour plus de détails.
+Le README annonce une licence MIT, mais aucun fichier `LICENSE` n’est présent dans l’arbre suivi actuel.
 
 ---
 
